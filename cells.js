@@ -13,7 +13,7 @@ var dotslist = [],
   mainlist = [];
 
 var fps = 60,
-  tpf = 3,
+  tpf = 1,
   loopon = true,
   debug = true,
   channels = { global: true, objectdata: false },
@@ -107,11 +107,10 @@ class Dot {
           this.targ = NaN
         } else {
           targvec = this.targ.l.copy().sub(this.l)
-          this.f.add(targvec.normalize().mult(gamerule.dt[0]))
+          this.f.add(targvec.normalize().mult(gamerule.dt[0]*5))
         }
       } else if (gamerule.dt[0]==1) {
-        this.v.mult(0)
-
+        // this.v.mult(0)
       }
 
       for (let i = 0; i <= dotslist.length - 1; i++) {
@@ -130,7 +129,7 @@ class Dot {
                   this.c = 0
                 }
                 // let vecbt = this.l.copy().sub(idot.l).normalize().mult(this.v.mag()*this.m*0.01 + Math.exp(0.1*(csize-d))*0.01+1)
-                let vecbt = this.l.copy().sub(idot.l).normalize().mult((csize - (d)) * 0.5)
+                let vecbt = this.l.copy().sub(idot.l).normalize().mult((csize - (d)) * 0.9)
                 let a = Math.cos(this.v.angleBetween(idot.v))
                 let damp = 0.98
                 let dmult = (damp + (1 - damp) * a)
@@ -205,6 +204,7 @@ function drawArrow(base, vec, myColor, min = 0, max = 200, bounds = true) {
   if (vec.equals(0, 0)) {
     fill(myColor)
     ellipse(base.x, base.y, 5)
+    pop();
   } else {
     strokeWeight(2);
     stroke(myColor);
