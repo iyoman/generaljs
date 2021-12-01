@@ -10,7 +10,8 @@ var zoom = 1,
 var dotslist = [],
   gridx = [],
   gridy = [],
-  mainlist = [];
+  mainlist = [],
+  selected = [];
 
 var fps = 60,
   tpf = 1,
@@ -31,7 +32,7 @@ function setup() {
   centery = height / 2;
 
   new Dot({ x: width / 2, y: height / 2 + 200, lock: false, size: 100, name: "big", m: 1000, maxhealth: 10000, team: teams.purple });
-  new Dot({ x: 100, y: 50, lock: false, size: 140, name: "smol", m: 1000, maxhealth: 1000, team: teams.green, targ:dotslist[0] });
+  new Dot({ x: 100, y: 50, lock: false, size: 140, name: "smol", m: 1000, maxhealth: 1000, team: teams.green, targ: dotslist[0] });
   mainlist.forEach(function (e) {
     e.initialize();
   });
@@ -64,7 +65,7 @@ class Dot {
     m = 1000,
     color = [40, 100, 100],
     targ = NaN,
-    targl = createVector(100, 100),
+    targl = NaN,
     grav = createVector(width / 2, height / 2),
     lock = false,
     name = "dot",
@@ -91,6 +92,7 @@ class Dot {
     this.damage = damage
     this.cool = cool
     this.c = 0
+    this.sel = false
     dotslist.push(this);
     mainlist.push(this);
   }
@@ -107,13 +109,18 @@ class Dot {
           this.targ = NaN
         } else {
           targvec = this.targ.l.copy().sub(this.l)
-          this.f.add(targvec.normalize().mult(gamerule.dt[0]*5))
+          this.f.add(targvec.normalize().mult(gamerule.dt[0] * 5))
         }
-      } else if (gamerule.dt[0]==1) {
-        // this.v.mult(0)
+      } else if (this.targl) {
+        targvec = this.targl.copy().sub(this.l)
+        this.f.add(targvec.normalize().mult(gamerule.dt[0] * 5))
+      } else if (gamerule.dt[0] == 1) {
+        if (this.v.x < 0.01 && this.v.y < 0.01) {
+          this.v.mult(0)
+        }
       }
 
-      for (let i = 0; i <= dotslist.length - 1; i++) {
+      for (let i = 0; i < dotslist.length; i++) {
         let idot = dotslist[i]
         if (idot != this && idot.lock == false) {
           let csize = this.size + idot.size
@@ -144,8 +151,8 @@ class Dot {
               }
             }
           }
-        }
-      }
+        } //if !lock
+      } //update
 
       // console.log(this.f)
       // let gx = round(this.l.x/100)
@@ -163,7 +170,7 @@ class Dot {
       //     }
       //   }
       // }}
-      this.f.add(this.v.copy().mult(this.v.mag()).mult(-30 * gamerule.dt[0]))
+      this.f.add(this.v.copy().mult(this.v.mag()).mult(-60 * gamerule.dt[0]))
       this.a.set(this.f.copy().div(this.m))
     }
   }
@@ -191,6 +198,13 @@ class Dot {
     fill(this.color[0], this.color[1], this.color[2]);
     ellipse(this.l.x, this.l.y, map(this.health, 0, this.maxhealth, 0, this.size * 2, true))
     drawArrow(this.l, this.v, "blue", 0, 0.5)
+    if (this.targ) {
+      drawArrow(this.l, this.targ.l, 'yellow', 0, 50, false, false)
+    }
+    if (this.sel) {
+      fill(55, 100, 100, 50)
+      ellipse(this.l.x, this.l.y, this.size * 2);
+    }
     pop();
   }
 
@@ -199,7 +213,7 @@ class Dot {
   }
 }
 
-function drawArrow(base, vec, myColor, min = 0, max = 200, bounds = true) {
+function drawArrow(base, vec, myColor, min = 0, max = 200, velocity = true, bounds = true) {
   push();
   if (vec.equals(0, 0)) {
     fill(myColor)
@@ -209,7 +223,12 @@ function drawArrow(base, vec, myColor, min = 0, max = 200, bounds = true) {
     strokeWeight(2);
     stroke(myColor);
     fill(myColor);
-    let targ = vec.copy().add(base);
+    let targ
+    if (velocity == true) {
+      targ = vec.copy().add(base);
+    } else {
+      targ = vec
+    }
     let vecbt = targ.copy().sub(base);
     let mag = vecbt.mag()
     mag = map(mag, min, max, 0, 50, bounds)
@@ -249,51 +268,6 @@ function textwall(x, y, xoffset, list) {
   pop();
 }
 
-function mouseDragged() {
-  let realx = (mouseX - centerx) / (zoom) + centerx - zpos.x
-  let realy = (mouseY - centery) / (zoom) + centery - zpos.y
-  new Dot({ x: realx, y: realy, targ: dotslist[0] })
-}
-
-function mousePressed() { }
-
-function keyPressed() {
-  keyz[keyCode] = true;
-
-  togbutton(32, "dt");
-  togbutton(76, "backg")
-  if (keyz[75] == true) {
-    if (isLooping()) {
-      noLoop()
-    } else {
-      loop()
-    }
-  }
-  if (keyz[72]==true) {
-    mainlist.splice(1,1)
-  }
-  if (keyz[71]==true) {
-    mainlist.splice(0,1)
-  }
-  if (keyz[74] == true) {
-    redraw()
-  }
-}
-
-function keyReleased() {
-  keyz[keyCode] = false;
-
-}
-
-function mouseWheel(event) {
-  if (event.delta > 0) {
-    zoom *= zscl
-  }
-  if (event.delta < 0) {
-    zoom /= zscl;
-  }
-}
-
 function lg(message, ch = "global") {
   if (channels.global == true && channels[ch] == true) {
     console.log(message);
@@ -310,18 +284,117 @@ function togbutton(code, index) {
   }
 }
 
+function touching(x, y, rad) {
+  let touchers = []
+  for (let i = 0; i < dotslist.length; i++) {
+    let idot = dotslist[i]
+    if (idot.lock == false) {
+      let csize = rad + idot.size
+      if (btwn(idot.l.x + csize, idot.l.x - csize, x)) {
+        if (btwn(idot.l.y + csize, idot.l.y - csize, y)) {
+          let d = dist(x, y, idot.l.x, idot.l.y)
+          if (d <= csize) {
+            touchers.push(idot)
+          }
+        }
+      }
+    }
+  }
+  return touchers
+}
+
+function mouseDragged() {
+  let realx = (mouseX - centerx) / (zoom) + centerx - zpos.x
+  let realy = (mouseY - centery) / (zoom) + centery - zpos.y
+  new Dot({ x: realx, y: realy, targ: dotslist[0] })
+}
+
+function mousePressed() {
+  let realx = (mouseX - centerx) / (zoom) + centerx - zpos.x
+  let realy = (mouseY - centery) / (zoom) + centery - zpos.y
+  if (mouseButton === LEFT) {
+    if (keyz[16] == true) {
+      let sellist = touching(realx, realy, brushsize)
+      sellist.forEach(e => {
+        e.sel = true
+      });
+    } else {
+      let mousetarg = touching(realx, realy, 1)[0]
+      if (mousetarg) {
+        for (let i = 0; i < selected.length; i++) {
+          let idot = selected[i];
+          idot.targ = mousetarg
+          idot.targl = NaN
+        }
+      } else {
+        for (let i = 0; i < selected.length; i++) {
+          let idot = selected[i];
+          idot.targl = createVector(realx, realy)
+          idot.targ = NaN
+        }
+      }
+    }
+  }
+}
+
+function keyPressed() {
+  keyz[keyCode] = true;
+
+  togbutton(32, "dt");
+  togbutton(76, "backg")
+  if (keyz[75] == true) {
+    if (isLooping()) {
+      noLoop()
+    } else {
+      loop()
+    }
+  }
+  if (keyz[72] == true) {
+    mainlist.splice(1, 1)
+  }
+  if (keyz[71] == true) {
+    mainlist.splice(0, 1)
+  }
+  if (keyz[74] == true) {
+    redraw()
+  }
+  if (keyz[81] == true) {
+    for (let i = 0; i < dotslist.length; i++) {
+      let idot = dotslist[i];
+      idot.sel = false
+    }
+  }
+}
+
+function mouseClicked() {
+
+}
+
+function keyReleased() {
+  keyz[keyCode] = false;
+}
+
+function mouseWheel(event) {
+  if (event.delta > 0) {
+    zoom *= zscl
+  }
+  if (event.delta < 0) {
+    zoom /= zscl;
+  }
+}
+
 function draw() {
   textdisplay = [
     ["FPS", round(frameRate())],
     ["Total Objects", mainlist.length],
     ["Simulation Speed", gamerule.dt[0]],
-    ["mouse", [mouseX,mouseY]],
+    ["mouse", [mouseX, mouseY]],
     ["sp", dotslist[0].v.mag()],
     ['f', dotslist[0].f.mag()],
     ["health", dotslist[0].health],
     ["a", dotslist[0].a.mag()],
     ["c", dotslist[0].c],
-    ["targ",dotslist[0].targ.l]
+    ["targ", dotslist[0].targ.l]
   ]
 
   push();
@@ -353,10 +426,19 @@ function draw() {
     e.render();
   });
 
+  selected = []
+  for (let i = 0; i < dotslist.length; i++) {
+    let idot = dotslist[i];
+    if (idot.sel == true) {
+      selected.push(idot)
+    }
+  }
+
   let realx = (mouseX - centerx) / (zoom) + centerx - zpos.x
   let realy = (mouseY - centery) / (zoom) + centery - zpos.y
-  // fill(60,100,90)
-  // ellipse(realx,realy,brushsize*2)
+  fill(60, 100, 90, 50)
+  ellipse(realx, realy, brushsize * 2)
+
   pop();
 
   if (keyz[37] == true || keyz[65] == true) {
